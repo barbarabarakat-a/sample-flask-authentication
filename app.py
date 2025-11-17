@@ -2,22 +2,15 @@ from flask_login import LoginManager, login_user, current_user, logout_user, log
 from models.user import User
 from database import db
 from flask import Flask, request, jsonify
-
-import sys
-import os
-sys.path.append(os.path.dirname(__file__))
+import bcrypt
 
 
 app = Flask(__name__)  # atraves do Flask eu posso criar a aplicacao
-
-
 # Configuracoes:
 # A primeira: relacionada ao flask / vai precisar disso para autenticacao
 app.config['SECRET_KEY'] = "your_secret_key"
 # A segunda: e aonde o seu banco de dados vai ficar, e como se conectar atraves dele.
-#app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///.instance/database.db"  #"sqlite:///database.db"
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'instance', 'database.db')}"
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud'
 
 # Inicializacoes
 db.init_app(app)  # db = SQLAlchemy(app) - Com essa variavel voce cria uma instancia da SQLAlchemy, ou seja vai ser um objeto. AQUI E AONDE A CONEXAO VAI EXISTIR
@@ -35,7 +28,7 @@ def load_user(user_id):
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json  # recuperar o que o usuario mandou
-    print("Recebido:", data)
+    #print("Recebido:", data) debug
     username = data.get("username")  # recebendo as credenciais
     password = data.get("password")  # recebendo as credenciais
 
@@ -46,7 +39,7 @@ def login():
         
         user = User.query.filter_by(username=username).first() #retorna uma lista, mas precisamos so de um username, entao adicionar o first(), se nao, usamos o all()
        
-        if user and user.password == password:
+        if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
             login_user(user)  # para fazer a autenticacao
             print(current_user.is_authenticated)
             return jsonify({"message": "Autenticacao realizada com sucesso"})
@@ -62,14 +55,14 @@ def logout():
 
 #Rota de Cadastrado:
 @app.route('/user', methods=['POST'])
-@login_required
 def create_user():
     data = request.json
     username = data.get("username")
     password = data.get("password")
 
     if username and password:
-        user = User(username=username, password=password)
+        hashed_password = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        user = User(username=username, password=hashed_password, role='user')
         db.session.add(user)
         db.session.commit()
         return jsonify({"message": "Usuario cadastrado com sucesso"})
@@ -94,6 +87,9 @@ def update_user(id_user):
     data = request.json
     user = User.query.get(id_user)
 
+    if current_user.role != "admin":
+        return jsonify({"message":"Operacao nao permitida"}), 403
+    
     if user and data.get("password"):
         user.password = data.get("password")
         db.session.commit()
@@ -107,6 +103,8 @@ def update_user(id_user):
 def delete_user(id_user):
     user = User.query.get(id_user)
 
+    if id_user != current_user.id and current_user.role == "user":
+        return jsonify({"message": "Operacao nao permitida"}), 403
     if id_user == current_user.id:  #verificar se ele quer apagar o usuario autenticado
         return jsonify({"message": "delecao nao permitida"}), 403
     
@@ -123,6 +121,7 @@ def delete_user(id_user):
 # @app.route("/hello-world", methods=['GET'])
 # def hello_world():
 #     return "Hello World!"
+
 
 
 # para executar, precisamos saber se ele esta sendo executado manualmente.

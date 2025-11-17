@@ -1,0 +1,17 @@
+#Informacoes que eu preciso para subir o meu servico
+services:
+  db: #servico
+    image: mysql:latest #A imagem que diz o que voce quer subir
+    restart: always #configuracoes
+    environment:
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'admin123'
+      MYSQL_DATABASE: 'flask-crud'
+      MYSQL_ROOT_PASSWORD: 'admin123'
+    ports:
+      - "3306:3306"
+    expose:
+      # Opens port 3306 on the container
+      - '3306'
+    volumes:
+      - /Users/barba/OneDrive/Desktop/Rockeseat/mysql:/var/lib/mysql
